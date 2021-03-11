@@ -19,4 +19,15 @@ pub struct TorrentInfo {
     pub GbSize: f32,
     pub uploadFX: f32,
     pub downloadFX: f32,
+    pub seeder: i32,
+    pub leecher: i32,
+    pub avgProgress: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct RssInfo {
+    pub title: String,
+    pub url: String,
+    pub cat: String,
+    pub U2Info: TorrentInfo,
 }

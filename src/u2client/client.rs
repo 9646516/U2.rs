@@ -2,20 +2,23 @@ use std::collections::HashMap;
 
 use regex::Regex;
 use reqwest::IntoUrl;
+use rss::Channel;
 use select::document::Document;
 use select::predicate::Name;
 
-use crate::u2client::types::TorrentInfo;
 use crate::u2client::types::UserInfo;
+use crate::u2client::types::{RssInfo, TorrentInfo};
 use crate::u2client::Result;
 
 pub struct U2client {
     uid: String,
+    passkey: String,
     container: reqwest::Client,
 }
 
 impl U2client {
-    pub async fn new(cookie: &str, proxy: Option<&str>) -> Result<U2client> {
+    pub async fn new(cookie: &str, passkey: &str, proxy: Option<&str>) -> Result<U2client> {
+        let passkey = passkey.to_string();
         let mut headers = reqwest::header::HeaderMap::new();
         headers.insert(
             reqwest::header::COOKIE,
@@ -57,7 +60,11 @@ impl U2client {
                 .last()
                 .unwrap()
                 .to_string();
-            Ok(U2client { uid, container })
+            Ok(U2client {
+                uid,
+                passkey,
+                container,
+            })
         } else {
             Err("illegal cookie".into())
         }
@@ -73,19 +80,20 @@ impl U2client {
         let body: HashMap<String, String> = U2client::parseHtml(&context, 2);
 
         let t = U2client::reduceToText(&body, "BT时间");
-        let timeRate = U2client::matchRegex(&t, "做种/下载时间比率:[' ']*([0-9.]+)");
-        let uploadTime = U2client::matchRegex(&t, "做种时间:[' ']*([天0-9:' ']+[0-9])");
-        let downloadTime = U2client::matchRegex(&t, "下载时间:[' ']*([天0-9:' ']+[0-9])");
+        let timeRate = U2client::matchRegex(&t, "做种/下载时间比率:[' ']*([0-9.]+)").unwrap();
+        let uploadTime = U2client::matchRegex(&t, "做种时间:[' ']*([天0-9:' ']+[0-9])").unwrap();
+        let downloadTime = U2client::matchRegex(&t, "下载时间:[' ']*([天0-9:' ']+[0-9])").unwrap();
 
         let t = U2client::reduceToText(&body, "传输[历史]");
-        let shareRate = U2client::matchRegex(&t, "分享率:[' ']*([0-9.]+)");
-        let upload = U2client::matchRegex(&t, "上传量:[' ']*([0-9.' ']+[TGMK]iB)");
-        let download = U2client::matchRegex(&t, "下载量:[' ']*([0-9.' ']+[TGMK]iB)");
-        let actualUpload = U2client::matchRegex(&t, "实际上传:[' ']*([0-9.' ']+[TGMK]iB)");
-        let actualDownload = U2client::matchRegex(&t, "实际下载:[' ']*([0-9.' ']+[TGMK]iB)");
+        let shareRate = U2client::matchRegex(&t, "分享率:[' ']*([0-9.]+)").unwrap();
+        let upload = U2client::matchRegex(&t, "上传量:[' ']*([0-9.' ']+[TGMK]iB)").unwrap();
+        let download = U2client::matchRegex(&t, "下载量:[' ']*([0-9.' ']+[TGMK]iB)").unwrap();
+        let actualUpload = U2client::matchRegex(&t, "实际上传:[' ']*([0-9.' ']+[TGMK]iB)").unwrap();
+        let actualDownload =
+            U2client::matchRegex(&t, "实际下载:[' ']*([0-9.' ']+[TGMK]iB)").unwrap();
 
         let t = U2client::reduceToText(&body, "UCoin[详情]");
-        let coin = U2client::matchRegex(&t, "[(]([0-9.,]+)[)]");
+        let coin = U2client::matchRegex(&t, "[(]([0-9.,]+)[)]").unwrap();
 
         Ok(UserInfo {
             download,
@@ -103,29 +111,35 @@ impl U2client {
         })
     }
 
-    pub async fn getTorrent(&self) {}
-    pub async fn getTorrentInfo(&self, idx: String) -> Result<TorrentInfo> {
-        let toNumber = |x: &str| {
-            let x = U2client::matchRegex(&x.to_string(), "([0-9.]+)");
-            let x = x.as_bytes();
-            let len = x.len();
-            let mut f = 0.0;
-            let mut s = 0.0;
-            for i in 0..len {
-                if *x.get(i).unwrap() == b'.' {
-                    break;
-                } else {
-                    f = f * 10.0 + (x.get(i).unwrap() - b'0') as f32;
-                }
-            }
-            for i in (0..len).rev() {
-                if *x.get(i).unwrap() == b'.' {
-                    break;
-                } else {
-                    s = s * 0.1 + (x.get(i).unwrap() - b'0') as f32;
-                }
-            }
-            f + s * 0.1
+    pub async fn getTorrent(&self) -> Result<Vec<RssInfo>> {
+        let url = format!(
+            "https://u2.dmhy.org/torrentrss.php?rows=50&trackerssl=1&passkey={}",
+            self.passkey
+        );
+        let content = self.get(url).await?.into_bytes();
+        let channel = Channel::read_from(&content[..])?;
+        let res = channel.items.iter().map(async move |x| -> Result<RssInfo> {
+            let title = x.title.clone().unwrap();
+            let url = x.enclosure.clone().unwrap().url;
+            let cat = x.categories[0].name.clone();
+            let uid = U2client::matchRegex(url.as_str(), "id=([0-9]+)").unwrap();
+            let U2Info = self.getTorrentInfo(&uid).await?;
+            Ok(RssInfo {
+                title,
+                url,
+                cat,
+                U2Info,
+            })
+        });
+        let res: Vec<Result<RssInfo>> = futures::future::join_all(res).await;
+        let res = res.iter().map(|x| x.as_ref().unwrap().clone()).collect();
+        Ok(res)
+    }
+    pub async fn getTorrentInfo(&self, idx: &str) -> Result<TorrentInfo> {
+        let toNumber = |x: &str| -> Result<f32> {
+            Ok(U2client::matchRegex(&x.to_string(), "([0-9.]+)")
+                .unwrap()
+                .parse::<f32>()?)
         };
         let context = self
             .get(format!("https://u2.dmhy.org/details.php?id={}", idx))
@@ -135,37 +149,58 @@ impl U2client {
         let doc = Document::from(body.get("流量优惠").unwrap().as_str());
         let sink = doc.find(select::predicate::Any).next().unwrap();
 
-        let typeNode = sink.find(Name("img")).next().unwrap().attr("alt").unwrap();
-        let (uploadFX, downloadFX) = match typeNode {
-            "FREE" => (1.0, 0.0),
-            "2X Free" => (2.0, 0.0),
-            "30%" => (1.0, 0.3),
-            "2X 50%" => (2.0, 0.5),
-            "50%" => (1.0, 0.5),
-            "2X" => (2.0, 1.0),
-            "Promotion" => {
-                let mut iters = sink.find(Name("b"));
+        let typeNode = sink.find(Name("img")).next();
+        let (uploadFX, downloadFX) = if let Some(typeNode) = typeNode {
+            let typeNode = typeNode.attr("alt").unwrap();
+            match typeNode {
+                "FREE" => (1.0, 0.0),
+                "2X Free" => (2.0, 0.0),
+                "30%" => (1.0, 0.3),
+                "2X 50%" => (2.0, 0.5),
+                "50%" => (1.0, 0.5),
+                "2X" => (2.0, 1.0),
+                "Promotion" => {
+                    let mut iters = sink.find(Name("b"));
 
-                let f = toNumber(&*iters.next().unwrap().text());
-                let s = toNumber(&*iters.next().unwrap().text());
-                (f, s)
+                    let f = toNumber(&*iters.next().unwrap().text())?;
+                    let s = toNumber(&*iters.next().unwrap().text())?;
+                    (f, s)
+                }
+                _ => (1.0, 1.0),
             }
-            _ => (1.0, 1.0),
+        } else {
+            (1.0, 1.0)
         };
 
         let s = U2client::reduceToText(&body, "基本信息");
-        let size = U2client::matchRegex(&s, "大小:[' ']*([0-9.' ']+[TGMK]iB)");
-        let number = toNumber(&*size);
+        let size = U2client::matchRegex(&s, "大小:[' ']*([0-9.' ']+[TGMK]iB)").unwrap();
+        let number = toNumber(&*size)?;
         let GbSize = match size.chars().nth(size.len() - 3).unwrap() {
             'T' => number * 1024.0,
             'G' => number,
             'M' => number / 1024.0,
             _ => number / 1024.0 / 1024.0,
         };
+
+        let s = U2client::reduceToText(&body, "同伴[查看列表][隐藏列表]");
+        let seeder = U2client::matchRegex(&s, "([0-9]+)[' ']*个做种者")
+            .unwrap()
+            .parse::<i32>()?;
+        let leecher = U2client::matchRegex(&s, "([0-9]+)[' ']*个下载者")
+            .unwrap()
+            .parse::<i32>()?;
+
+        let s = U2client::reduceToText(&body, "活力度");
+        let avgProgress = U2client::matchRegex(&s, "平均进度:[' ']*[(]([0-9]+%)[)]")
+            .unwrap_or_else(|| String::from("0%"));
+
         Ok(TorrentInfo {
             GbSize,
             uploadFX,
             downloadFX,
+            seeder,
+            leecher,
+            avgProgress,
         })
     }
     async fn get<T>(&self, url: T) -> Result<String>
@@ -180,16 +215,16 @@ impl U2client {
         }
     }
 
-    fn matchRegex(src: &str, reg: &str) -> String {
-        Regex::new(reg)
-            .unwrap()
-            .captures_iter(src)
-            .next()
-            .unwrap()
-            .get(1)
-            .unwrap()
-            .as_str()
-            .to_string()
+    fn matchRegex(src: &str, reg: &str) -> Option<String> {
+        Some(
+            Regex::new(reg)
+                .unwrap()
+                .captures_iter(src)
+                .next()?
+                .get(1)?
+                .as_str()
+                .to_string(),
+        )
     }
 
     fn reduceToText(mp: &HashMap<String, String>, idx: &str) -> String {

@@ -1,4 +1,5 @@
 #![allow(non_snake_case)]
+#![feature(async_closure)]
 
 use u2client::client::U2client;
 
