@@ -3,10 +3,12 @@
 
 use u2client::client::U2client;
 
+pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
+
 pub mod torrentLib;
 pub mod u2client;
 
 #[tokio::main]
-async fn main() -> u2client::Result<()> {
+async fn main() -> Result<()> {
     Ok(())
 }

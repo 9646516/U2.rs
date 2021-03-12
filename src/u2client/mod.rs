@@ -1,4 +1,6 @@
+pub use crate::Result;
+
 pub mod client;
 pub mod types;
+pub mod strategy;
 
-pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;

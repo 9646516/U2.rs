@@ -1,4 +1,6 @@
 use std::collections::HashMap;
+use std::io::Write;
+use std::path::Path;
 
 use regex::Regex;
 use reqwest::IntoUrl;
@@ -6,18 +8,24 @@ use rss::Channel;
 use select::document::Document;
 use select::predicate::Name;
 
-use crate::u2client::types::UserInfo;
+use crate::torrentLib::TransClient;
+use crate::torrentLib::types::{BasicAuth, Id, SessionGet, Torrent, TorrentAddArgs, Torrents};
 use crate::u2client::types::{RssInfo, TorrentInfo};
-use crate::u2client::Result;
+use crate::u2client::types::UserInfo;
+
+use super::Result;
 
 pub struct U2client {
     uid: String,
     passkey: String,
     container: reqwest::Client,
+    torrentClient: TransClient,
+    tempSpace: String,
+    workSpace: String,
 }
 
 impl U2client {
-    pub async fn new(cookie: &str, passkey: &str, proxy: Option<&str>) -> Result<U2client> {
+    pub async fn new(cookie: &str, passkey: &str, proxy: Option<&str>, port: i32, user: &str, passwd: &str, root: &str) -> Result<U2client> {
         let passkey = passkey.to_string();
         let mut headers = reqwest::header::HeaderMap::new();
         headers.insert(
@@ -60,15 +68,70 @@ impl U2client {
                 .last()
                 .unwrap()
                 .to_string();
+
+
+            let tempSpace = format!("{}/temp", root);
+            if !Path::new(&tempSpace).exists() {
+                std::fs::create_dir(&tempSpace).unwrap();
+            }
+            let workSpace = format!("{}/work", root);
+            if !Path::new(&workSpace).exists() {
+                std::fs::create_dir(&workSpace).unwrap();
+            }
+            let basic_auth = BasicAuth {
+                user: user.to_string(),
+                password: passwd.to_string(),
+            };
+
             Ok(U2client {
                 uid,
                 passkey,
                 container,
+                torrentClient: TransClient::with_auth(
+                    &format!("http://127.0.0.1:{}/transmission/rpc", port),
+                    basic_auth,
+                ),
+                tempSpace,
+                workSpace,
             })
         } else {
             Err("illegal cookie".into())
         }
     }
+    pub async fn removeTorrent(&self, V: &[i64]) -> Result<()> {
+        let V = V.iter().map(|x| Id::Id(*x)).collect();
+        let _ = self.torrentClient.torrent_remove(V, true).await?;
+        Ok(())
+    }
+    pub async fn addTorrent(&self, url: &str) -> Result<()> {
+        let s = self.container.get(url).send().await?;
+        let contentDisposition = s.headers().get("content-disposition").unwrap().to_str().unwrap();
+        let filename = U2client::matchRegex(contentDisposition, "filename=%5BU2%5D.(.+)").unwrap();
+        let to = format!("{}/{}", self.tempSpace, filename);
+        let to = Path::new(to.as_str());
+        let content = s.bytes().await?;
+        if to.exists() {
+            let _ = std::fs::remove_file(to);
+        }
+        let mut file = std::fs::File::create(to)?;
+        file.write_all(&*content)?;
+
+        let add: TorrentAddArgs = TorrentAddArgs {
+            filename: Some(to.to_str().unwrap().to_string()),
+            download_dir: Some(self.workSpace.clone()),
+            ..TorrentAddArgs::default()
+        };
+        let _ = self.torrentClient.torrent_add(add).await?;
+        Ok(())
+    }
+    pub async fn getTransmissionSession(&self) -> Result<SessionGet> {
+        Ok(self.torrentClient.session_get().await?.arguments)
+    }
+
+    pub async fn getWorkSpace(&self) -> Result<Torrents<Torrent>> {
+        Ok(self.torrentClient.torrent_get(None, None).await?.arguments)
+    }
+
 
     pub async fn getUserInfo(&self) -> Result<UserInfo> {
         let context = self
@@ -204,8 +267,8 @@ impl U2client {
         })
     }
     async fn get<T>(&self, url: T) -> Result<String>
-    where
-        T: IntoUrl,
+        where
+            T: IntoUrl,
     {
         let ret = self.container.get(url).send().await?;
         if ret.status().as_u16() == 200 {
