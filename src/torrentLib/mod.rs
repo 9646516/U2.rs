@@ -10,6 +10,7 @@ use types::{TorrentAddArgs, TorrentAdded};
 
 pub mod types;
 
+#[derive(Clone)]
 pub struct TransClient {
     url: String,
     auth: Option<BasicAuth>,

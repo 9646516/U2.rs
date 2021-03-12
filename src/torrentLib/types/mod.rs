@@ -17,7 +17,7 @@ pub use self::response::Torrents;
 mod request;
 mod response;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BasicAuth {
     pub user: String,
     pub password: String,

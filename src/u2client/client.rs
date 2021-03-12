@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::io::Write;
 use std::path::Path;
 
@@ -16,6 +16,7 @@ use crate::u2client::types::{RssInfo, TorrentInfo};
 
 use super::Result;
 
+#[derive(Clone)]
 pub struct U2client {
     uid: String,
     passkey: String,
@@ -27,13 +28,13 @@ pub struct U2client {
 
 impl U2client {
     pub async fn new(
-        cookie: String,
-        passkey: String,
-        proxy: Option<String>,
-        RpcURL: String,
-        RpcUsername: String,
-        RpcPassword: String,
-        workRoot: String,
+        cookie: &str,
+        passkey: &str,
+        proxy: &Option<String>,
+        RpcURL: &str,
+        RpcUsername: &str,
+        RpcPassword: &str,
+        workRoot: &str,
     ) -> Result<U2client> {
         let passkey = passkey.to_string();
         let mut headers = reqwest::header::HeaderMap::new();
@@ -152,33 +153,22 @@ impl U2client {
         Ok(self.torrentClient.torrent_get(None, None).await?.arguments)
     }
 
-    pub async fn getDownloadList(&self) -> Result<Vec<String>> {
+    pub async fn getDownloadList(&self) -> Result<Vec<RssInfo>> {
         let rss = self.getTorrent().await?;
-        let torrentList = self
-            .getWorkingTorrent()
-            .await?
-            .torrents
-            .iter()
-            .map(|x| x.hash_string.as_ref().unwrap().clone())
-            .collect::<HashSet<String>>();
         Ok(rss
-            .iter()
+            .into_iter()
             .filter(|x| {
-                x.U2Info.downloadFX == 0.0
-                    && x.U2Info.avgProgress < 0.3
-                    && x.U2Info.seeder > 0
-                    && torrentList.contains(&x.U2Info.Hash)
+                x.U2Info.downloadFX == 0.0 && x.U2Info.avgProgress < 0.3 && x.U2Info.seeder > 0
             })
-            .map(|x| x.url.to_string())
             .collect())
     }
 
-    pub async fn getRemove(&self) -> Result<Torrent> {
+    pub async fn getRemove(&self) -> Result<Vec<Torrent>> {
         let mut torrent = self.getWorkingTorrent().await?;
         torrent
             .torrents
             .sort_by_key(|x| (x.peers_getting_from_us.unwrap(), x.added_date.unwrap()));
-        Ok(torrent.torrents.get(0).unwrap().clone())
+        Ok(torrent.torrents.into_iter().take(5).collect())
     }
 
     pub async fn getUserInfo(&self) -> Result<UserInfo> {
