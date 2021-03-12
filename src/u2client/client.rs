@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::io::Write;
 use std::path::Path;
 
@@ -8,10 +8,11 @@ use rss::Channel;
 use select::document::Document;
 use select::predicate::Name;
 
-use crate::torrentLib::TransClient;
+use crate::torrentLib::types::TorrentAction;
 use crate::torrentLib::types::{BasicAuth, Id, SessionGet, Torrent, TorrentAddArgs, Torrents};
-use crate::u2client::types::{RssInfo, TorrentInfo};
+use crate::torrentLib::TransClient;
 use crate::u2client::types::UserInfo;
+use crate::u2client::types::{RssInfo, TorrentInfo};
 
 use super::Result;
 
@@ -25,7 +26,15 @@ pub struct U2client {
 }
 
 impl U2client {
-    pub async fn new(cookie: &str, passkey: &str, proxy: Option<&str>, port: i32, user: &str, passwd: &str, root: &str) -> Result<U2client> {
+    pub async fn new(
+        cookie: String,
+        passkey: String,
+        proxy: Option<String>,
+        RpcURL: String,
+        RpcUsername: String,
+        RpcPassword: String,
+        workRoot: String,
+    ) -> Result<U2client> {
         let passkey = passkey.to_string();
         let mut headers = reqwest::header::HeaderMap::new();
         headers.insert(
@@ -37,7 +46,7 @@ impl U2client {
             .cookie_store(true)
             .default_headers(headers);
 
-        if let Some(x) = proxy {
+        if let Some(ref x) = proxy {
             let proxy = reqwest::Proxy::http(x)?;
             container = container.proxy(proxy);
 
@@ -69,28 +78,24 @@ impl U2client {
                 .unwrap()
                 .to_string();
 
-
-            let tempSpace = format!("{}/temp", root);
+            let tempSpace = format!("{}/temp", workRoot);
             if !Path::new(&tempSpace).exists() {
                 std::fs::create_dir(&tempSpace).unwrap();
             }
-            let workSpace = format!("{}/work", root);
+            let workSpace = format!("{}/work", workRoot);
             if !Path::new(&workSpace).exists() {
                 std::fs::create_dir(&workSpace).unwrap();
             }
             let basic_auth = BasicAuth {
-                user: user.to_string(),
-                password: passwd.to_string(),
+                user: RpcUsername.to_string(),
+                password: RpcPassword.to_string(),
             };
 
             Ok(U2client {
                 uid,
                 passkey,
                 container,
-                torrentClient: TransClient::with_auth(
-                    &format!("http://127.0.0.1:{}/transmission/rpc", port),
-                    basic_auth,
-                ),
+                torrentClient: TransClient::with_auth(&RpcURL, basic_auth),
                 tempSpace,
                 workSpace,
             })
@@ -98,14 +103,21 @@ impl U2client {
             Err("illegal cookie".into())
         }
     }
-    pub async fn removeTorrent(&self, V: &[i64]) -> Result<()> {
-        let V = V.iter().map(|x| Id::Id(*x)).collect();
-        let _ = self.torrentClient.torrent_remove(V, true).await?;
+    pub async fn removeTorrent(&self, id: String) -> Result<()> {
+        let _ = self
+            .torrentClient
+            .torrent_remove(vec![Id::Hash(id)], true)
+            .await?;
         Ok(())
     }
     pub async fn addTorrent(&self, url: &str) -> Result<()> {
         let s = self.container.get(url).send().await?;
-        let contentDisposition = s.headers().get("content-disposition").unwrap().to_str().unwrap();
+        let contentDisposition = s
+            .headers()
+            .get("content-disposition")
+            .unwrap()
+            .to_str()
+            .unwrap();
         let filename = U2client::matchRegex(contentDisposition, "filename=%5BU2%5D.(.+)").unwrap();
         let to = format!("{}/{}", self.tempSpace, filename);
         let to = Path::new(to.as_str());
@@ -128,10 +140,46 @@ impl U2client {
         Ok(self.torrentClient.session_get().await?.arguments)
     }
 
-    pub async fn getWorkSpace(&self) -> Result<Torrents<Torrent>> {
+    pub async fn performActionOnTorrent(&self, id: String, op: TorrentAction) -> Result<()> {
+        let _ = self
+            .torrentClient
+            .torrent_action(op, vec![Id::Hash(id)])
+            .await?;
+        Ok(())
+    }
+
+    pub async fn getWorkingTorrent(&self) -> Result<Torrents<Torrent>> {
         Ok(self.torrentClient.torrent_get(None, None).await?.arguments)
     }
 
+    pub async fn getDownloadList(&self) -> Result<Vec<String>> {
+        let rss = self.getTorrent().await?;
+        let torrentList = self
+            .getWorkingTorrent()
+            .await?
+            .torrents
+            .iter()
+            .map(|x| x.hash_string.as_ref().unwrap().clone())
+            .collect::<HashSet<String>>();
+        Ok(rss
+            .iter()
+            .filter(|x| {
+                x.U2Info.downloadFX == 0.0
+                    && x.U2Info.avgProgress < 0.3
+                    && x.U2Info.seeder > 0
+                    && torrentList.contains(&x.U2Info.Hash)
+            })
+            .map(|x| x.url.to_string())
+            .collect())
+    }
+
+    pub async fn getRemove(&self) -> Result<Torrent> {
+        let mut torrent = self.getWorkingTorrent().await?;
+        torrent
+            .torrents
+            .sort_by_key(|x| (x.peers_getting_from_us.unwrap(), x.added_date.unwrap()));
+        Ok(torrent.torrents.get(0).unwrap().clone())
+    }
 
     pub async fn getUserInfo(&self) -> Result<UserInfo> {
         let context = self
@@ -256,7 +304,10 @@ impl U2client {
         let s = U2client::reduceToText(&body, "活力度");
         let avgProgress = U2client::matchRegex(&s, "平均进度:[' ']*[(]([0-9]+%)[)]")
             .unwrap_or_else(|| String::from("0%"));
+        let avgProgress = toNumber(&avgProgress)? / 100.0;
 
+        let s = U2client::reduceToText(&body, "种子信息");
+        let Hash = U2client::matchRegex(&s, "种子散列值:[' ']*([0-9a-z]*)[' ']*").unwrap();
         Ok(TorrentInfo {
             GbSize,
             uploadFX,
@@ -264,11 +315,12 @@ impl U2client {
             seeder,
             leecher,
             avgProgress,
+            Hash,
         })
     }
     async fn get<T>(&self, url: T) -> Result<String>
-        where
-            T: IntoUrl,
+    where
+        T: IntoUrl,
     {
         let ret = self.container.get(url).send().await?;
         if ret.status().as_u16() == 200 {

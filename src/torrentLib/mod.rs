@@ -1,12 +1,12 @@
 use reqwest::header::CONTENT_TYPE;
 use serde::de::DeserializeOwned;
 
-use types::{Id, Torrent, TorrentGetField, Torrents};
-use types::{Nothing, Result, RpcRequest, RpcResponse, RpcResponseArgument};
-use types::{TorrentAddArgs, TorrentAdded};
 use types::BasicAuth;
 use types::SessionGet;
 use types::TorrentAction;
+use types::{Id, Torrent, TorrentGetField, Torrents};
+use types::{Nothing, Result, RpcRequest, RpcResponse, RpcResponseArgument};
+use types::{TorrentAddArgs, TorrentAdded};
 
 pub mod types;
 
@@ -32,11 +32,15 @@ impl TransClient {
         } else {
             client.post(&self.url)
         }
-            .header(CONTENT_TYPE, "application/json")
+        .header(CONTENT_TYPE, "application/json")
     }
 
     async fn get_session_id(&self) -> String {
-        let response = self.rpc_request().json(&RpcRequest::session_get()).send().await;
+        let response = self
+            .rpc_request()
+            .json(&RpcRequest::session_get())
+            .send()
+            .await;
         let session_id = match response {
             Ok(ref resp) => match resp.headers().get("x-transmission-session-id") {
                 Some(res) => res.to_str().expect("header value should be a string"),
@@ -44,7 +48,7 @@ impl TransClient {
             },
             _ => "",
         }
-            .to_owned();
+        .to_owned();
         session_id
     }
 
@@ -52,16 +56,29 @@ impl TransClient {
         self.call(RpcRequest::session_get()).await
     }
 
-    pub async fn torrent_get(&self, fields: Option<Vec<TorrentGetField>>, ids: Option<Vec<Id>>) -> Result<RpcResponse<Torrents<Torrent>>> {
+    pub async fn torrent_get(
+        &self,
+        fields: Option<Vec<TorrentGetField>>,
+        ids: Option<Vec<Id>>,
+    ) -> Result<RpcResponse<Torrents<Torrent>>> {
         self.call(RpcRequest::torrent_get(fields, ids)).await
     }
 
-    pub async fn torrent_action(&self, action: TorrentAction, ids: Vec<Id>) -> Result<RpcResponse<Nothing>> {
+    pub async fn torrent_action(
+        &self,
+        action: TorrentAction,
+        ids: Vec<Id>,
+    ) -> Result<RpcResponse<Nothing>> {
         self.call(RpcRequest::torrent_action(action, ids)).await
     }
 
-    pub async fn torrent_remove(&self, ids: Vec<Id>, delete_local_data: bool) -> Result<RpcResponse<Nothing>> {
-        self.call(RpcRequest::torrent_remove(ids, delete_local_data)).await
+    pub async fn torrent_remove(
+        &self,
+        ids: Vec<Id>,
+        delete_local_data: bool,
+    ) -> Result<RpcResponse<Nothing>> {
+        self.call(RpcRequest::torrent_remove(ids, delete_local_data))
+            .await
     }
 
     pub async fn torrent_add(&self, add: TorrentAddArgs) -> Result<RpcResponse<TorrentAdded>> {
@@ -72,8 +89,8 @@ impl TransClient {
     }
 
     async fn call<RS>(&self, request: RpcRequest) -> Result<RpcResponse<RS>>
-        where
-            RS: RpcResponseArgument + DeserializeOwned + std::fmt::Debug,
+    where
+        RS: RpcResponseArgument + DeserializeOwned + std::fmt::Debug,
     {
         let rq: reqwest::RequestBuilder = self
             .rpc_request()

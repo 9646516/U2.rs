@@ -1,3 +1,5 @@
+use serde_derive::Deserialize;
+
 #[derive(Debug, Clone)]
 pub struct UserInfo {
     pub download: String,
@@ -21,7 +23,8 @@ pub struct TorrentInfo {
     pub downloadFX: f32,
     pub seeder: i32,
     pub leecher: i32,
-    pub avgProgress: String,
+    pub avgProgress: f32,
+    pub Hash: String,
 }
 
 #[derive(Debug, Clone)]
@@ -30,4 +33,16 @@ pub struct RssInfo {
     pub url: String,
     pub cat: String,
     pub U2Info: TorrentInfo,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct Config {
+    pub cookie: String,
+    pub passkey: String,
+    pub workRoot: String,
+    pub proxy: Option<String>,
+
+    pub RpcURL: String,
+    pub RpcUsername: String,
+    pub RpcPassword: String,
 }

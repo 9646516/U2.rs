@@ -60,7 +60,6 @@ pub trait ArgumentFields {}
 
 impl ArgumentFields for TorrentGetField {}
 
-//FIXME: this enum is too large,use pointer instead
 #[derive(Serialize, Debug, RustcEncodable, Clone)]
 #[serde(untagged)]
 pub enum Args {
@@ -126,20 +125,6 @@ pub struct TorrentAddArgs {
     pub metainfo: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub paused: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none", rename = "peer-limit")]
-    pub peer_limit: Option<i64>,
-    #[serde(skip_serializing_if = "Option::is_none", rename = "bandwidthPriority")]
-    pub bandwidth_priority: Option<i64>,
-    #[serde(skip_serializing_if = "Option::is_none", rename = "files-wanted")]
-    pub files_wanted: Option<Vec<File>>,
-    #[serde(skip_serializing_if = "Option::is_none", rename = "files-unwanted")]
-    pub files_unwanted: Option<Vec<File>>,
-    #[serde(skip_serializing_if = "Option::is_none", rename = "priority-high")]
-    pub priority_high: Option<Vec<File>>,
-    #[serde(skip_serializing_if = "Option::is_none", rename = "priority-low")]
-    pub priority_low: Option<Vec<File>>,
-    #[serde(skip_serializing_if = "Option::is_none", rename = "priority-normal")]
-    pub priority_normal: Option<Vec<File>>,
 }
 
 impl Default for TorrentAddArgs {
@@ -150,20 +135,8 @@ impl Default for TorrentAddArgs {
             filename: None,
             metainfo: None,
             paused: None,
-            peer_limit: None,
-            bandwidth_priority: None,
-            files_wanted: None,
-            files_unwanted: None,
-            priority_high: None,
-            priority_low: None,
-            priority_normal: None,
         }
     }
-}
-
-#[derive(Serialize, Debug, RustcEncodable, Clone)]
-pub struct File {
-    //todo
 }
 
 #[derive(Clone, IntoEnumIterator)]
@@ -238,7 +211,7 @@ impl TorrentGetField {
             TorrentGetField::Uploadratio => "uploadRatio",
             TorrentGetField::Webseedssendingtous => "webseedsSendingToUs",
         }
-            .to_string()
+        .to_string()
     }
 }
 
@@ -259,6 +232,6 @@ impl TorrentAction {
             TorrentAction::Verify => "torrent-verify",
             TorrentAction::Reannounce => "torrent-reannounce",
         }
-            .to_string()
+        .to_string()
     }
 }

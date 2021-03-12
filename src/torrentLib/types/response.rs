@@ -1,4 +1,5 @@
 use serde::Deserialize;
+
 #[derive(Deserialize, Debug)]
 pub struct RpcResponse<T: RpcResponseArgument> {
     pub arguments: T,
@@ -10,6 +11,7 @@ impl<T: RpcResponseArgument> RpcResponse<T> {
         self.result == "success"
     }
 }
+
 pub trait RpcResponseArgument {}
 
 #[derive(Deserialize, Debug, Clone)]
@@ -25,6 +27,7 @@ pub struct SessionGet {
     pub rpc_version_minimum: i32,
     pub version: String,
 }
+
 impl RpcResponseArgument for SessionGet {}
 
 #[derive(Deserialize, Debug, RustcEncodable, Clone)]
@@ -81,6 +84,7 @@ pub struct Torrent {
 pub struct Torrents<T> {
     pub torrents: Vec<T>,
 }
+
 impl RpcResponseArgument for Torrents<Torrent> {}
 
 #[derive(Deserialize, Debug, RustcEncodable, Clone)]
@@ -91,6 +95,7 @@ pub struct Trackers {
 
 #[derive(Deserialize, Debug, RustcEncodable)]
 pub struct Nothing {}
+
 impl RpcResponseArgument for Nothing {}
 
 #[derive(Deserialize, Debug, RustcEncodable)]
@@ -98,4 +103,5 @@ pub struct TorrentAdded {
     #[serde(rename = "torrent-added")]
     pub torrent_added: Option<Torrent>,
 }
+
 impl RpcResponseArgument for TorrentAdded {}
