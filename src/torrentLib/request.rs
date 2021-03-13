@@ -1,7 +1,7 @@
 use enum_iterator::IntoEnumIterator;
 use serde::Serialize;
 
-#[derive(Serialize, Debug, RustcEncodable)]
+#[derive(Serialize, Debug)]
 pub struct RpcRequest {
     method: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -13,6 +13,20 @@ impl RpcRequest {
         RpcRequest {
             method: String::from("session-get"),
             arguments: None,
+        }
+    }
+
+    pub fn session_stats() -> RpcRequest {
+        RpcRequest {
+            method: String::from("session-stats"),
+            arguments: None,
+        }
+    }
+
+    pub fn free_space(dir: String) -> RpcRequest {
+        RpcRequest {
+            method: String::from("free-space"),
+            arguments: Some(Args::FreeSpaceArgs(FreeSpaceArgs { path: dir })),
         }
     }
 
@@ -60,16 +74,17 @@ pub trait ArgumentFields {}
 
 impl ArgumentFields for TorrentGetField {}
 
-#[derive(Serialize, Debug, RustcEncodable, Clone)]
+#[derive(Serialize, Debug, Clone)]
 #[serde(untagged)]
 pub enum Args {
     TorrentGetArgs(TorrentGetArgs),
     TorrentActionArgs(TorrentActionArgs),
     TorrentRemoveArgs(TorrentRemoveArgs),
     TorrentAddArgs(TorrentAddArgs),
+    FreeSpaceArgs(FreeSpaceArgs),
 }
 
-#[derive(Serialize, Debug, RustcEncodable, Clone)]
+#[derive(Serialize, Debug, Clone)]
 pub struct TorrentGetArgs {
     #[serde(skip_serializing_if = "Option::is_none")]
     fields: Option<Vec<String>>,
@@ -89,38 +104,38 @@ impl Default for TorrentGetArgs {
     }
 }
 
-#[derive(Serialize, Debug, RustcEncodable, Clone)]
+#[derive(Serialize, Debug, Clone)]
+pub struct FreeSpaceArgs {
+    path: String,
+}
+
+#[derive(Serialize, Debug, Clone)]
 pub struct TorrentActionArgs {
     ids: Vec<Id>,
 }
 
-#[derive(Serialize, Debug, RustcEncodable, Clone)]
+#[derive(Serialize, Debug, Clone)]
 pub struct TorrentRemoveArgs {
     ids: Vec<Id>,
     #[serde(rename = "delete-local-data")]
     delete_local_data: bool,
 }
 
-#[derive(Serialize, Debug, RustcEncodable, Clone)]
+#[derive(Serialize, Debug, Clone)]
 #[serde(untagged)]
 pub enum Id {
     Id(i64),
     Hash(String),
 }
 
-#[derive(Serialize, Debug, RustcEncodable, Clone)]
+#[derive(Serialize, Debug, Clone)]
 pub struct TorrentAddArgs {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cookies: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", rename = "download-dir")]
     pub download_dir: Option<String>,
-    /// Either "filename" OR "metainfo" MUST be included
-    /// semi-optional
-    /// filename or URL of the .torrent file
     #[serde(skip_serializing_if = "Option::is_none")]
     pub filename: Option<String>,
-    /// semi-optional
-    /// base64-encoded .torrent content
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metainfo: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]

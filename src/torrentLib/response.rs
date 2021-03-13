@@ -1,18 +1,16 @@
 use serde::Deserialize;
 
 #[derive(Deserialize, Debug)]
-pub struct RpcResponse<T: RpcResponseArgument> {
+pub struct RpcResponse<T> {
     pub arguments: T,
     pub result: String,
 }
 
-impl<T: RpcResponseArgument> RpcResponse<T> {
+impl<T> RpcResponse<T> {
     pub fn is_ok(&self) -> bool {
         self.result == "success"
     }
 }
-
-pub trait RpcResponseArgument {}
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct SessionGet {
@@ -28,9 +26,7 @@ pub struct SessionGet {
     pub version: String,
 }
 
-impl RpcResponseArgument for SessionGet {}
-
-#[derive(Deserialize, Debug, RustcEncodable, Clone)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct Torrent {
     #[serde(rename = "addedDate")]
     pub added_date: Option<i64>,
@@ -80,28 +76,51 @@ pub struct Torrent {
     pub uploaded_ever: Option<i64>,
 }
 
-#[derive(Deserialize, Debug, RustcEncodable)]
+#[derive(Deserialize, Debug)]
 pub struct Torrents<T> {
     pub torrents: Vec<T>,
 }
 
-impl RpcResponseArgument for Torrents<Torrent> {}
-
-#[derive(Deserialize, Debug, RustcEncodable, Clone)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct Trackers {
     pub id: i32,
     pub announce: String,
 }
 
-#[derive(Deserialize, Debug, RustcEncodable)]
+#[derive(Deserialize, Debug)]
 pub struct Nothing {}
 
-impl RpcResponseArgument for Nothing {}
-
-#[derive(Deserialize, Debug, RustcEncodable)]
+#[derive(Deserialize, Debug)]
 pub struct TorrentAdded {
     #[serde(rename = "torrent-added")]
     pub torrent_added: Option<Torrent>,
 }
 
-impl RpcResponseArgument for TorrentAdded {}
+#[derive(Deserialize, Debug, Clone)]
+pub struct FreeSpace {
+    pub path: Option<String>,
+    #[serde(rename = "size-bytes")]
+    pub size_bytes: Option<u64>,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct SessionStats {
+    pub activeTorrentCount: u64,
+    pub downloadSpeed: u64,
+    pub pausedTorrentCount: u64,
+    pub torrentCount: u64,
+    pub uploadSpeed: u64,
+    #[serde(rename = "cumulative-stats")]
+    pub cumulative_stats: Stats,
+    #[serde(rename = "current-stats")]
+    pub current_stats: Stats,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct Stats {
+    pub uploadedBytes: u64,
+    pub downloadedBytes: u64,
+    pub filesAdded: u64,
+    pub sessionCount: u64,
+    pub secondsActive: u64,
+}

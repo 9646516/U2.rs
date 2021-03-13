@@ -1,13 +1,11 @@
+use crate::torrentLib::request::TorrentAction;
+use crate::u2client::client::U2client;
+use crate::{u2client, Result};
 use std::thread::sleep;
 use std::time::Duration;
 
-use crate::torrentLib::types::TorrentAction;
-use crate::u2client::client::U2client;
-use crate::*;
-use std::process::exit;
-
 #[tokio::test]
-async fn main() -> Result<()> {
+async fn test() -> Result<()> {
     let f = std::fs::read_to_string("args.toml")?;
     let args: u2client::types::Config = toml::from_str(f.as_str()).unwrap();
     let agent = U2client::new(
@@ -20,9 +18,7 @@ async fn main() -> Result<()> {
         &args.workRoot,
     )
     .await?;
-    let res = agent.getTorrentInfo("14312").await?;
-    println!("{:?}\n", res);
-    exit(0);
+
     let res = agent.getTransmissionSession().await?;
     println!("{:?}\n", res);
     let res = agent.getWorkingTorrent().await?;

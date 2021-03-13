@@ -17,7 +17,7 @@ pub mod torrentLib;
 pub mod u2client;
 
 #[cfg(test)]
-mod test;
+mod tests;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -38,7 +38,14 @@ async fn main() -> Result<()> {
         let backend = CrosstermBackend::new(stdout());
         let mut terminal = Terminal::new(backend).unwrap();
         terminal.clear().unwrap();
+        let handleOne = async || -> Result<()> { Ok(()) };
         loop {
+            match handleOne().await {
+                Ok(_) => {}
+                Err(x) => {
+                    panic!("{}", x);
+                }
+            }
             terminal.draw(|f| UI::draw(f)).unwrap();
             let _ = sleep(Duration::from_millis(200)).await;
         }
@@ -76,6 +83,6 @@ async fn main() -> Result<()> {
             let _ = sleep(Duration::from_secs(4)).await;
         }
     });
-    let _ = tokio::join!(UI,server);
+    let _ = tokio::join!(UI, server);
     Ok(())
 }

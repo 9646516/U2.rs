@@ -8,13 +8,13 @@ use rss::Channel;
 use select::document::Document;
 use select::predicate::Name;
 
-use crate::torrentLib::types::TorrentAction;
-use crate::torrentLib::types::{BasicAuth, Id, SessionGet, Torrent, TorrentAddArgs, Torrents};
-use crate::torrentLib::TransClient;
+use crate::torrentLib::client::{BasicAuth, TransClient};
 use crate::u2client::types::UserInfo;
 use crate::u2client::types::{RssInfo, TorrentInfo};
 
 use super::Result;
+use crate::torrentLib::request::{Id, TorrentAction, TorrentAddArgs};
+use crate::torrentLib::response::{FreeSpace, SessionGet, SessionStats, Torrent, Torrents};
 
 #[derive(Clone)]
 pub struct U2client {
@@ -151,6 +151,14 @@ impl U2client {
 
     pub async fn getWorkingTorrent(&self) -> Result<Torrents<Torrent>> {
         Ok(self.torrentClient.torrent_get(None, None).await?.arguments)
+    }
+
+    pub async fn getStats(&self) -> Result<SessionStats> {
+        Ok(self.torrentClient.session_stats().await?.arguments)
+    }
+
+    pub async fn getFreeSpace(&self, d: String) -> Result<FreeSpace> {
+        Ok(self.torrentClient.free_space(d).await?.arguments)
     }
 
     pub async fn getDownloadList(&self) -> Result<Vec<RssInfo>> {

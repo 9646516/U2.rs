@@ -1,10 +1,10 @@
 use tui::{
     backend::Backend,
-    Frame,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Style},
     text::Span,
     widgets::{Block, Borders, Cell, Row, Table},
+    Frame,
 };
 
 pub fn draw<B: Backend>(f: &mut Frame<B>) {
