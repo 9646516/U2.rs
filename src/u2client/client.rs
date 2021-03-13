@@ -9,12 +9,12 @@ use select::document::Document;
 use select::predicate::Name;
 
 use crate::torrentLib::client::{BasicAuth, TransClient};
+use crate::torrentLib::request::{Id, TorrentAction, TorrentAddArgs};
+use crate::torrentLib::response::{FreeSpace, SessionGet, SessionStats, Torrent, Torrents};
 use crate::u2client::types::UserInfo;
 use crate::u2client::types::{RssInfo, TorrentInfo};
 
 use super::Result;
-use crate::torrentLib::request::{Id, TorrentAction, TorrentAddArgs};
-use crate::torrentLib::response::{FreeSpace, SessionGet, SessionStats, Torrent, Torrents};
 
 #[derive(Clone)]
 pub struct U2client {
@@ -186,6 +186,16 @@ impl U2client {
                 self.uid
             ))
             .await?;
+
+        let username = Document::from(context.as_str())
+            .find(Name("a"))
+            .find(|x| match x.attr("class") {
+                Some(x) => x == "User_Name",
+                _ => false,
+            })
+            .unwrap()
+            .text();
+
         let body: HashMap<String, String> = U2client::parseHtml(&context, 2);
 
         let t = U2client::reduceToText(&body, "BT时间");
@@ -205,6 +215,7 @@ impl U2client {
         let coin = U2client::matchRegex(&t, "[(]([0-9.,]+)[)]").unwrap();
 
         Ok(UserInfo {
+            username,
             download,
             upload,
             shareRate,
