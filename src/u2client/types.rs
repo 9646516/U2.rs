@@ -52,7 +52,7 @@ pub struct Config {
 
 #[derive(Debug)]
 pub struct Status {
-    pub hardware: System,
-    pub local: crate::torrentLib::response::SessionStats,
-    pub remote: UserInfo,
+    pub hardware: Option<System>,
+    pub local: Option<crate::torrentLib::response::SessionStats>,
+    pub remote: Option<UserInfo>,
 }
