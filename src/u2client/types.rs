@@ -50,6 +50,8 @@ pub struct Config {
     pub RpcPassword: String,
 
     pub LogRoot: String,
+
+    pub maxSize: f32,
 }
 
 #[derive(Debug)]

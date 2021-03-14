@@ -3,7 +3,7 @@ use std::io::BufReader;
 use std::option::Option::Some;
 
 use rev_lines::RevLines;
-use sysinfo::{DiskExt, NetworkExt, NetworksExt, ProcessorExt, System, SystemExt};
+use sysinfo::{ComponentExt, DiskExt, NetworkExt, NetworksExt, ProcessorExt, System, SystemExt};
 use tui::{
     backend::Backend,
     layout::{Constraint, Direction, Layout, Rect},
@@ -102,7 +102,7 @@ fn drawLog<B: Backend>(f: &mut Frame<B>, area: Rect, x: &Option<String>) {
         if let Ok(file) = file {
             let rev_lines = RevLines::new(BufReader::new(file)).unwrap();
             rev_lines
-                .take(20)
+                .take(25)
                 .map(|x| Row::new(vec![Cell::from(Span::raw(x))]))
                 .collect::<Vec<Row>>()
         } else {
@@ -176,7 +176,7 @@ fn drawRemoteInfo<B: Backend>(f: &mut Frame<B>, area: Rect, x: &Option<UserInfo>
             ]
         }
         None => {
-            vec![vec![Cell::from(Span::raw("Get User Failed".to_string()))]]
+            vec![vec![Cell::from(Span::raw("loading".to_string()))]]
         }
     };
 
@@ -206,7 +206,7 @@ fn drawHardwareInfo<B: Backend>(f: &mut Frame<B>, area: Rect, sys: &Option<Syste
                 vec![
                     Cell::from(Span::raw(brand.to_string())),
                     Cell::from(Span::raw(format!(
-                        "{} days {} hours {} mins {} s",
+                        "{} days {} hours {} mins {}",
                         days, hours, minutes, secs
                     ))),
                 ],
@@ -240,44 +240,87 @@ fn drawHardwareInfo<B: Backend>(f: &mut Frame<B>, area: Rect, sys: &Option<Syste
                     )),
                 ],
             ];
-            //FIXME
-            sys.get_disks().iter().for_each(|i| {
-                items.push(vec![
-                    Cell::from(Span::raw(format!(
-                        "{:?} {}",
-                        i.get_type(),
-                        i.get_mount_point().to_str().unwrap()
-                    ))),
-                    Cell::from(Span::styled(
-                        format!("Free {:.3}GB", i.get_available_space() as f32 / 1e9),
-                        Style::default().fg(Color::Yellow),
-                    )),
-                    Cell::from(Span::raw(format!(
-                        "Total {:.3}GB",
-                        i.get_total_space() as f32 / 1e9
-                    ))),
-                ])
-            });
 
-            sys.get_networks().iter().for_each(|(a, b)| {
-                let mut a = a.clone();
-                a.truncate(20);
-                items.push(vec![
-                    Cell::from(Span::raw(a)),
-                    Cell::from(Span::raw(format!(
-                        "Download {:.3}GB",
-                        b.get_total_received() as f32 / 1e9
-                    ))),
-                    Cell::from(Span::raw(format!(
-                        "Upload {:.3}GB",
-                        b.get_total_transmitted() as f32 / 1e9
-                    ))),
-                ])
-            });
+            let mut s = sys
+                .get_disks()
+                .iter()
+                .map(|i| {
+                    (
+                        i.get_mount_point().to_str().unwrap().to_string(),
+                        vec![
+                            Cell::from(Span::raw(format!(
+                                "{:?} {}",
+                                i.get_type(),
+                                i.get_mount_point().to_str().unwrap()
+                            ))),
+                            Cell::from(Span::styled(
+                                format!("Free {:.3}GB", i.get_available_space() as f32 / 1e9),
+                                Style::default().fg(Color::Yellow),
+                            )),
+                            Cell::from(Span::raw(format!(
+                                "Total {:.3}GB",
+                                i.get_total_space() as f32 / 1e9
+                            ))),
+                        ],
+                    )
+                })
+                .collect::<Vec<(String, Vec<Cell>)>>();
+
+            macro_rules! gao {
+                ($arg:tt) => {
+                    ($arg).sort_by_key(|x| x.0.to_owned());
+                    let s: Vec<Vec<Cell>> = ($arg).into_iter().map(|x| x.1).collect();
+                    for i in s.into_iter() {
+                        items.push(i);
+                    }
+                };
+            }
+            gao!(s);
+
+            let mut s = sys
+                .get_networks()
+                .iter()
+                .map(|(a, b)| {
+                    let mut a = a.clone();
+                    a.truncate(20);
+                    (
+                        a.to_owned(),
+                        vec![
+                            Cell::from(Span::raw(a)),
+                            Cell::from(Span::raw(format!(
+                                "Download {:.3}GB",
+                                b.get_total_received() as f32 / 1e9
+                            ))),
+                            Cell::from(Span::raw(format!(
+                                "Upload {:.3}GB",
+                                b.get_total_transmitted() as f32 / 1e9
+                            ))),
+                        ],
+                    )
+                })
+                .collect::<Vec<(String, Vec<Cell>)>>();
+            gao!(s);
+
+            let mut s = sys
+                .get_components()
+                .iter()
+                .map(|x| {
+                    (
+                        x.get_label().to_string(),
+                        vec![
+                            Cell::from(Span::raw(x.get_label().to_string())),
+                            Cell::from(Span::raw(format!("Temp {:.3}", x.get_temperature()))),
+                            Cell::from(Span::raw(format!("Max {:.3}", x.get_max()))),
+                        ],
+                    )
+                })
+                .collect::<Vec<(String, Vec<Cell>)>>();
+            gao!(s);
+
             items
         }
         None => {
-            vec![vec![Cell::from(Span::raw("Get User Failed".to_string()))]]
+            vec![vec![Cell::from(Span::raw("loading".to_string()))]]
         }
     };
 
@@ -333,9 +376,7 @@ fn drawLocalInfo<B: Backend>(f: &mut Frame<B>, area: Rect, x: &Option<SessionSta
             ]
         }
         None => {
-            vec![vec![Cell::from(Span::raw(
-                "Get Local Info Failed".to_string(),
-            ))]]
+            vec![vec![Cell::from(Span::raw("loading".to_string()))]]
         }
     };
     let items: Vec<Row> = items.into_iter().map(Row::new).collect();
@@ -370,7 +411,7 @@ fn drawStats<B: Backend>(f: &mut Frame<B>, area: Rect, x: &Stats, head: &str) {
             Cell::from(Span::raw(format!("Files Added {}", x.filesAdded))),
             Cell::from(Span::raw(format!("Sessions {}", x.sessionCount))),
             Cell::from(Span::raw(format!(
-                "Active {} days {} hours {} mins {} s",
+                "Active {} days {} hours {} mins {}",
                 days, hours, minutes, secs
             ))),
         ],
