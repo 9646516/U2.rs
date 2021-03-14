@@ -19,3 +19,6 @@ toml = "0.5.8"
 crossterm = "0.19.0"
 tui = { version = "0.14", default-features = false, features = ['crossterm'] }
 sysinfo = "0.16.4"
+log = "0.4.14"
+log4rs = { version = "1.0.0", features = ["rolling_file_appender", "compound_policy", "size_trigger", "fixed_window_roller"] }
+rev_lines = "0.2.1"

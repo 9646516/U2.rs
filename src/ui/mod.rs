@@ -1,5 +1,8 @@
+use std::fs::File;
+use std::io::BufReader;
 use std::option::Option::Some;
 
+use rev_lines::RevLines;
 use sysinfo::{DiskExt, NetworkExt, NetworksExt, ProcessorExt, System, SystemExt};
 use tui::{
     backend::Backend,
@@ -42,7 +45,7 @@ impl Default for TabsState {
     }
 }
 
-pub fn draw<B: Backend>(f: &mut Frame<B>, x: Status, mask: u8, idx: u8) {
+pub fn draw<B: Backend>(f: &mut Frame<B>, x: Status, mask: u8, idx: usize) {
     let chunks = Layout::default()
         .constraints([Constraint::Percentage(10), Constraint::Percentage(90)].as_ref())
         .direction(Direction::Vertical)
@@ -51,7 +54,7 @@ pub fn draw<B: Backend>(f: &mut Frame<B>, x: Status, mask: u8, idx: u8) {
     let items: Vec<Vec<Cell>> = vec![TITLE
         .iter()
         .map(|x| {
-            if x == TITLE.get(idx as usize).unwrap() {
+            if x == TITLE.get(idx).unwrap() {
                 Cell::from(Span::styled(
                     x.to_owned(),
                     Style::default().fg(Color::Yellow),
@@ -87,10 +90,31 @@ pub fn draw<B: Backend>(f: &mut Frame<B>, x: Status, mask: u8, idx: u8) {
             drawLocalInfo(f, area, &x.local, mask & 1);
         }
         2 => {
-            //FIXME
+            drawLog(f, area, &x.logDir);
         }
         _ => {}
     }
+}
+
+fn drawLog<B: Backend>(f: &mut Frame<B>, area: Rect, x: &Option<String>) {
+    let items: Vec<Row> = if let Some(x) = x {
+        let file = File::open(x);
+        if let Ok(file) = file {
+            let rev_lines = RevLines::new(BufReader::new(file)).unwrap();
+            rev_lines
+                .take(20)
+                .map(|x| Row::new(vec![Cell::from(Span::raw(x))]))
+                .collect::<Vec<Row>>()
+        } else {
+            vec![Row::new(vec![Cell::from(Span::raw("failed to get log"))])]
+        }
+    } else {
+        vec![Row::new(vec![Cell::from(Span::raw("failed to get log"))])]
+    };
+    let table = Table::new(items)
+        .block(Block::default().title("Logs").borders(Borders::ALL))
+        .widths(&[Constraint::Percentage(100)]);
+    f.render_widget(table, area);
 }
 
 fn splitTime(mut time: u64) -> (u64, u64, u64, u64) {

@@ -48,6 +48,8 @@ pub struct Config {
     pub RpcURL: String,
     pub RpcUsername: String,
     pub RpcPassword: String,
+
+    pub LogRoot: String,
 }
 
 #[derive(Debug)]
@@ -55,4 +57,5 @@ pub struct Status {
     pub hardware: Option<System>,
     pub local: Option<crate::torrentLib::response::SessionStats>,
     pub remote: Option<UserInfo>,
+    pub logDir: Option<String>,
 }
