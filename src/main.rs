@@ -140,7 +140,7 @@ async fn main() -> Result<()> {
                     error!("promote:{}", x);
                 }
             }
-            sleep(Duration::from_secs(4)).await;
+            sleep(Duration::from_secs(60)).await;
         }
     });
 

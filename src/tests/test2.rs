@@ -19,9 +19,7 @@ async fn test() -> Result<()> {
     println!("{:?}\n", res);
     let res = agent.getStats().await?;
     println!("{:?}\n", res);
-
     let res = agent.getFreeSpace("E:".to_string()).await?;
     println!("{:?}\n", res);
-
     Ok(())
 }
