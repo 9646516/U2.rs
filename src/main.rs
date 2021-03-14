@@ -112,7 +112,11 @@ async fn main() -> Result<()> {
             let feed = agent.getDownloadList().await?;
 
             let work = feed.iter().filter_map(|i| {
-                if !torrentList.contains(&i.url) {
+                if !torrentList.contains(&i.url)
+                    && i.U2Info.downloadFX == 0.0
+                    && i.U2Info.avgProgress < 0.3
+                    && i.U2Info.seeder > 0
+                {
                     info!(
                         "promote:new job:{},{},{} GB",
                         &i.title, &i.cat, &i.U2Info.GbSize
@@ -123,7 +127,10 @@ async fn main() -> Result<()> {
                 }
             });
 
-            let _ = futures::future::join_all(work).await;
+            let res = futures::future::join_all(work).await;
+            for i in res.into_iter() {
+                let _ = i?;
+            }
             Ok(())
         };
         loop {
@@ -169,7 +176,7 @@ async fn main() -> Result<()> {
             } else {
                 error!("backEnd:get masks lock failed");
             }
-            sleep(Duration::from_millis(2000)).await;
+            sleep(Duration::from_secs(2)).await;
         }
     });
 
@@ -286,7 +293,10 @@ async fn main() -> Result<()> {
                     let hash = i.hash_string.ok_or("handleOne:broken hash")?;
                     all.push(agentSep2.removeTorrent(hash));
                 }
-                let _ = futures::future::join_all(all).await;
+                let res = futures::future::join_all(all).await;
+                for i in res.into_iter() {
+                    let _ = i?;
+                }
                 info!("maintain:del done");
             }
             Ok(())

@@ -40,7 +40,7 @@ impl U2client {
         let mut headers = reqwest::header::HeaderMap::new();
         headers.insert(
             reqwest::header::COOKIE,
-            format!("nexusphp_u2={}", cookie).parse().unwrap(),
+            format!("nexusphp_u2={}", cookie).parse()?,
         );
 
         let mut container = reqwest::Client::builder()
@@ -73,19 +73,19 @@ impl U2client {
                 .filter_map(|n| n.attr("href"))
                 .map(|x| x.to_string())
                 .next()
-                .unwrap()
+                .ok_or("get uid failed")?
                 .split('=')
                 .last()
-                .unwrap()
+                .ok_or("get uid failed")?
                 .to_string();
 
             let tempSpace = format!("{}/temp", workRoot);
             if !Path::new(&tempSpace).exists() {
-                std::fs::create_dir(&tempSpace).unwrap();
+                std::fs::create_dir(&tempSpace)?;
             }
             let workSpace = format!("{}/work", workRoot);
             if !Path::new(&workSpace).exists() {
-                std::fs::create_dir(&workSpace).unwrap();
+                std::fs::create_dir(&workSpace)?;
             }
             let basic_auth = BasicAuth {
                 user: RpcUsername.to_string(),
@@ -161,13 +161,7 @@ impl U2client {
     }
 
     pub async fn getDownloadList(&self) -> Result<Vec<RssInfo>> {
-        let rss = self.getTorrent().await?;
-        Ok(rss
-            .into_iter()
-            .filter(|x| {
-                x.U2Info.downloadFX == 0.0 && x.U2Info.avgProgress < 0.3 && x.U2Info.seeder > 0
-            })
-            .collect())
+        Ok(self.getTorrent().await?)
     }
 
     pub async fn getRemove(&self) -> Result<Vec<Torrent>> {

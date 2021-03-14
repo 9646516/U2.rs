@@ -96,21 +96,18 @@ pub fn draw<B: Backend>(f: &mut Frame<B>, x: Status, mask: u8, idx: usize) {
     }
 }
 
-fn drawLog<B: Backend>(f: &mut Frame<B>, area: Rect, x: &Option<String>) {
-    let items: Vec<Row> = if let Some(x) = x {
-        let file = File::open(x);
-        if let Ok(file) = file {
-            let rev_lines = RevLines::new(BufReader::new(file)).unwrap();
-            rev_lines
-                .take(25)
-                .map(|x| Row::new(vec![Cell::from(Span::raw(x))]))
-                .collect::<Vec<Row>>()
-        } else {
-            vec![Row::new(vec![Cell::from(Span::raw("failed to get log"))])]
-        }
-    } else {
-        vec![Row::new(vec![Cell::from(Span::raw("failed to get log"))])]
+fn drawLog<B: Backend>(f: &mut Frame<B>, area: Rect, log: &Option<String>) {
+    let F = |x: &Option<String>| -> crate::Result<Vec<Row>> {
+        let x = x.as_ref().ok_or("")?;
+        let file = File::open(x)?;
+        let rev_lines = RevLines::new(BufReader::new(file))?;
+        Ok(rev_lines
+            .take(25)
+            .map(|x| Row::new(vec![Cell::from(Span::raw(x))]))
+            .collect::<Vec<Row>>())
     };
+    let items =
+        F(log).unwrap_or_else(|_| vec![Row::new(vec![Cell::from(Span::raw("failed to get log"))])]);
     let table = Table::new(items)
         .block(Block::default().title("Logs").borders(Borders::ALL))
         .widths(&[Constraint::Percentage(100)]);
