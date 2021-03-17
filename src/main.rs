@@ -40,8 +40,8 @@ mod tests;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let f = std::fs::read_to_string("args.toml")?;
-    let args: u2client::types::Config = toml::from_str(f.as_str())?;
+    let f = std::fs::read_to_string("args.toml").expect("can not find args.toml");
+    let args: u2client::types::Config = toml::from_str(f.as_str()).expect("wrong toml format");
     let agent = Arc::from(
         U2client::new(
             &args.cookie,
@@ -112,7 +112,7 @@ async fn main() -> Result<()> {
             let feed = agent.getDownloadList().await?;
 
             let work = feed.iter().filter_map(|i| {
-                if !torrentList.contains(&i.url)
+                if !torrentList.contains(&i.U2Info.Hash)
                     && i.U2Info.downloadFX == 0.0
                     && i.U2Info.avgProgress < 0.3
                     && i.U2Info.seeder > 0

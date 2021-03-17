@@ -267,6 +267,7 @@ fn drawHardwareInfo<B: Backend>(f: &mut Frame<B>, area: Rect, sys: &Option<Syste
                 ($arg:tt) => {
                     ($arg).sort_by_key(|x| x.0.to_owned());
                     let s: Vec<Vec<Cell>> = ($arg).into_iter().map(|x| x.1).collect();
+                    items.push(vec![]);
                     for i in s.into_iter() {
                         items.push(i);
                     }
