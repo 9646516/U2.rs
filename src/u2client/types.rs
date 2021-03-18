@@ -45,6 +45,8 @@ pub struct Config {
     pub workRoot: String,
     pub proxy: Option<String>,
 
+    pub downloadFx: Option<f32>,
+
     pub RpcURL: String,
     pub RpcUsername: String,
     pub RpcPassword: String,

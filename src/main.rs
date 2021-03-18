@@ -7,22 +7,24 @@ use std::path::Path;
 use std::result::Result::Ok;
 use std::sync::{Arc, RwLock};
 
-use crossterm::event::{self, Event as CEvent, KeyCode};
-use crossterm::terminal::disable_raw_mode;
-use crossterm::terminal::enable_raw_mode;
-use log::error;
-use log::info;
-use log::LevelFilter;
-use log4rs::append::rolling_file::policy::compound::roll::fixed_window::FixedWindowRoller;
-use log4rs::append::rolling_file::policy::compound::trigger::size::SizeTrigger;
-use log4rs::append::rolling_file::policy::compound::CompoundPolicy;
-use log4rs::append::rolling_file::RollingFileAppender;
+use crossterm::{
+    event::{self, EnableMouseCapture, Event as CEvent, KeyCode},
+    execute,
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen},
+};
 use log4rs::{
     config::{Appender, Config, Root},
     encode::pattern::PatternEncoder,
 };
+use log4rs::append::rolling_file::policy::compound::CompoundPolicy;
+use log4rs::append::rolling_file::policy::compound::roll::fixed_window::FixedWindowRoller;
+use log4rs::append::rolling_file::policy::compound::trigger::size::SizeTrigger;
+use log4rs::append::rolling_file::RollingFileAppender;
+use log::error;
+use log::info;
+use log::LevelFilter;
 use sysinfo::{System, SystemExt};
-use tokio::time::{sleep, Duration};
+use tokio::time::{Duration, sleep};
 use tui::{backend::CrosstermBackend, Terminal};
 
 use crate::u2client::client::U2client;
@@ -42,6 +44,7 @@ mod tests;
 async fn main() -> Result<()> {
     let f = std::fs::read_to_string("args.toml").expect("can not find args.toml");
     let args: u2client::types::Config = toml::from_str(f.as_str()).expect("wrong toml format");
+    let uploadFxFilter = args.downloadFx.to_owned().unwrap_or(0.0);
     let agent = Arc::from(
         U2client::new(
             &args.cookie,
@@ -52,7 +55,7 @@ async fn main() -> Result<()> {
             &args.RpcPassword,
             &args.workRoot,
         )
-        .await?,
+            .await?,
     );
 
     let root = args.LogRoot.to_owned();
@@ -97,7 +100,9 @@ async fn main() -> Result<()> {
     let tabStatusSep = Arc::clone(&tabStatus);
 
     enable_raw_mode()?;
-    let mut terminal = Terminal::new(CrosstermBackend::new(stdout()))?;
+    let mut stdout = stdout();
+    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+    let mut terminal = Terminal::new(CrosstermBackend::new(stdout))?;
     terminal.clear()?;
     info!("init done");
 
@@ -113,8 +118,8 @@ async fn main() -> Result<()> {
 
             let work = feed.iter().filter_map(|i| {
                 if !torrentList.contains(&i.U2Info.Hash)
-                    && i.U2Info.downloadFX == 0.0
-                    && i.U2Info.avgProgress < 0.3
+                    && i.U2Info.downloadFX <= uploadFxFilter
+                    && i.U2Info.avgProgress < 0.5
                     && i.U2Info.seeder > 0
                 {
                     info!(
@@ -126,11 +131,11 @@ async fn main() -> Result<()> {
                     None
                 }
             });
-
             let res = futures::future::join_all(work).await;
             for i in res.into_iter() {
                 let _ = i?;
             }
+            info!("promote:done");
             Ok(())
         };
         loop {
@@ -297,8 +302,8 @@ async fn main() -> Result<()> {
                 for i in res.into_iter() {
                     let _ = i?;
                 }
-                info!("maintain:del done");
             }
+            info!("maintain done");
             Ok(())
         };
         loop {

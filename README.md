@@ -4,7 +4,7 @@ U2.rs is a cross platform solution for u2.dmhy with terminal UI and dashboard
 
 ## Usage
 
-- install `Transmission `,make sure that transmission RPC can be accessed to
+- install `Transmission`,make sure that transmission RPC can be accessed to
 
 - prepare a `args.toml` in the same folder of the binaries
 
@@ -26,8 +26,8 @@ U2.rs is a cross platform solution for u2.dmhy with terminal UI and dashboard
   | RpcUsername | String     | No       | transmission RPC username                                    |
   | RpcPassword | String     | No       | transmission RPC password                                    |
   | LogRoot     | String     | No       | absolute path of logging directory                           |
-  | maxSize     | float      | No       | size limit of total size of downloaded files in GiB          |
-
+  | maxSize     | Float      | No       | size limit of total size of downloaded files in GiB          |
+  | downloadFx  | Float      | Yes      | downloadFx Filter                                            |
 - Run the binaries
 
 ## License 
