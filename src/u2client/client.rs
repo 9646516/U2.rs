@@ -11,8 +11,8 @@ use select::predicate::Name;
 use crate::torrentLib::client::{BasicAuth, TransClient};
 use crate::torrentLib::request::{Id, TorrentAction, TorrentAddArgs};
 use crate::torrentLib::response::{FreeSpace, SessionGet, SessionStats, Torrent, Torrents};
-use crate::u2client::types::{RssInfo, TorrentInfo};
 use crate::u2client::types::UserInfo;
+use crate::u2client::types::{RssInfo, TorrentInfo};
 
 use super::Result;
 
@@ -99,21 +99,26 @@ impl U2client {
                     ("search_mode", 1),
                 ])
                 .send()
-                .await?.text().await?;
-            let res = Document::from(res.as_str()).find(Name("a"))
+                .await?
+                .text()
+                .await?;
+            let res = Document::from(res.as_str())
+                .find(Name("a"))
                 .find(|x| match x.attr("class") {
                     Some(str) => {
                         if str == "faqlink" {
                             match x.attr("rel") {
                                 Some(str) => str == "nofollow noopener noreferer",
-                                _ => false
+                                _ => false,
                             }
                         } else {
                             false
                         }
                     }
                     _ => false,
-                }).unwrap().text();
+                })
+                .unwrap()
+                .text();
             let passkey = U2client::matchRegex(&res, "passkey=([0-9a-z]*)")?;
             Ok(U2client {
                 uid,
@@ -367,8 +372,8 @@ impl U2client {
         })
     }
     async fn get<T>(&self, url: T) -> Result<String>
-        where
-            T: IntoUrl,
+    where
+        T: IntoUrl,
     {
         let ret = self.container.get(url).send().await?;
         if ret.status().as_u16() == 200 {

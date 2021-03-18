@@ -12,19 +12,19 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen},
 };
+use log::error;
+use log::info;
+use log::LevelFilter;
+use log4rs::append::rolling_file::policy::compound::roll::fixed_window::FixedWindowRoller;
+use log4rs::append::rolling_file::policy::compound::trigger::size::SizeTrigger;
+use log4rs::append::rolling_file::policy::compound::CompoundPolicy;
+use log4rs::append::rolling_file::RollingFileAppender;
 use log4rs::{
     config::{Appender, Config, Root},
     encode::pattern::PatternEncoder,
 };
-use log4rs::append::rolling_file::policy::compound::CompoundPolicy;
-use log4rs::append::rolling_file::policy::compound::roll::fixed_window::FixedWindowRoller;
-use log4rs::append::rolling_file::policy::compound::trigger::size::SizeTrigger;
-use log4rs::append::rolling_file::RollingFileAppender;
-use log::error;
-use log::info;
-use log::LevelFilter;
 use sysinfo::{System, SystemExt};
-use tokio::time::{Duration, sleep};
+use tokio::time::{sleep, Duration};
 use tui::{backend::CrosstermBackend, Terminal};
 
 use crate::u2client::client::U2client;
@@ -54,7 +54,7 @@ async fn main() -> Result<()> {
             &args.RpcPassword,
             &args.workRoot,
         )
-            .await?,
+        .await?,
     );
 
     let root = args.logRoot.to_owned();
