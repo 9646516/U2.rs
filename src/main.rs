@@ -48,7 +48,6 @@ async fn main() -> Result<()> {
     let agent = Arc::from(
         U2client::new(
             &args.cookie,
-            &args.passkey,
             &args.proxy,
             &args.RpcURL,
             &args.RpcUsername,
@@ -58,7 +57,7 @@ async fn main() -> Result<()> {
             .await?,
     );
 
-    let root = args.LogRoot.to_owned();
+    let root = args.logRoot.to_owned();
     let rootPath = Path::new(&root);
 
     if !rootPath.exists() {
@@ -108,14 +107,17 @@ async fn main() -> Result<()> {
 
     let promote = tokio::task::spawn(async move {
         let handleOne = async || -> Result<()> {
+            let feed = agent.getDownloadList();
             let mut torrentList: HashSet<String> = HashSet::new();
-            let working = agent.getWorkingTorrent().await?.torrents;
+            let working = agent.getWorkingTorrent();
+            let (feed, working) = futures::future::join(feed, working).await;
+            let feed = feed?;
+            let working = working?.torrents;
+
             for x in working.into_iter() {
                 let x = x.hash_string.ok_or("handleOne:bad torrent hash")?;
                 torrentList.insert(x);
             }
-            let feed = agent.getDownloadList().await?;
-
             let work = feed.iter().filter_map(|i| {
                 if !torrentList.contains(&i.U2Info.Hash)
                     && i.U2Info.downloadFX <= uploadFxFilter

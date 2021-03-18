@@ -41,7 +41,6 @@ pub struct RssInfo {
 #[derive(Debug, Deserialize, Clone)]
 pub struct Config {
     pub cookie: String,
-    pub passkey: String,
     pub workRoot: String,
     pub proxy: Option<String>,
 
@@ -51,7 +50,7 @@ pub struct Config {
     pub RpcUsername: String,
     pub RpcPassword: String,
 
-    pub LogRoot: String,
+    pub logRoot: String,
 
     pub maxSize: f32,
 }
