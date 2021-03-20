@@ -253,7 +253,27 @@ impl U2client {
             timeRate,
         })
     }
-
+    /// 2 => Free 3 => 2x 4 => 2xFree 5 => 50%off 6 => 2x50%off 7 => 30%off
+    pub async fn applyMagic(&self, uid: &str, time: i32, magic: i32) -> Result<()> {
+        let time = time.max(24);
+        let url = format!(
+            "https://u2.dmhy.org/promotion.php?action=magic&torrent={}",
+            uid
+        );
+        let post = [
+            ("action", "magic".to_string()),
+            ("torrent", uid.to_string()),
+            ("user", "SELF".to_string()),
+            ("hours", time.to_string()),
+            ("promotion", magic.to_string()),
+        ];
+        let res = self.container.post(&url).form(&post).send().await?;
+        if res.status().as_u16() == 200 {
+            Ok(())
+        } else {
+            Err("apply magic failed:network failed".into())
+        }
+    }
     pub async fn getTorrent(&self) -> Result<Vec<RssInfo>> {
         let url = format!(
             "https://u2.dmhy.org/torrentrss.php?rows=50&trackerssl=1&passkey={}",
@@ -271,6 +291,7 @@ impl U2client {
                 title,
                 url,
                 cat,
+                uid,
                 U2Info,
             })
         });

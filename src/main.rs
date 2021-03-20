@@ -27,6 +27,7 @@ use sysinfo::{System, SystemExt};
 use tokio::time::{sleep, Duration};
 use tui::{backend::CrosstermBackend, Terminal};
 
+use crate::torrentLib::request::TorrentAction;
 use crate::u2client::client::U2client;
 use crate::u2client::types::Status;
 use crate::ui::TabsState;
@@ -44,7 +45,6 @@ mod tests;
 async fn main() -> Result<()> {
     let f = std::fs::read_to_string("args.toml").expect("can not find args.toml");
     let args: u2client::types::Config = toml::from_str(f.as_str()).expect("wrong toml format");
-    let uploadFxFilter = args.downloadFx.to_owned().unwrap_or(0.0);
     let agent = Arc::from(
         U2client::new(
             &args.cookie,
@@ -105,6 +105,9 @@ async fn main() -> Result<()> {
     terminal.clear()?;
     info!("init done");
 
+    let downdloadFxFilter = args.downloadFxFilter.to_owned().unwrap_or(0.0);
+    let GBSizeFilter = args.GBSizeFilter.to_owned().unwrap_or(0.0);
+
     let promote = tokio::task::spawn(async move {
         let handleOne = async || -> Result<()> {
             let feed = agent.getDownloadList();
@@ -118,19 +121,28 @@ async fn main() -> Result<()> {
                 let x = x.hash_string.ok_or("handleOne:bad torrent hash")?;
                 torrentList.insert(x);
             }
-            let work = feed.iter().filter_map(|i| {
-                if !torrentList.contains(&i.U2Info.Hash)
-                    && i.U2Info.downloadFX <= uploadFxFilter
-                    && i.U2Info.avgProgress < 0.5
-                    && i.U2Info.seeder > 0
+
+            let torrentListRef = &torrentList;
+            let agentRef = &agent;
+
+            let work = feed.iter().map(async move |i| -> Result<()> {
+                if i.U2Info.seeder == 0
+                    || torrentListRef.contains(&i.U2Info.Hash)
+                    || i.U2Info.avgProgress > 0.5
                 {
-                    info!(
-                        "promote:new job:{},{},{} GB",
-                        &i.title, &i.cat, &i.U2Info.GbSize
-                    );
-                    Some(agent.addTorrent(&i.url))
+                    Ok(())
                 } else {
-                    None
+                    if i.U2Info.downloadFX > downdloadFxFilter && i.U2Info.GbSize > GBSizeFilter {
+                        let time = (i.U2Info.GbSize * 1024.0 / 5.0 / 3600.0).floor() as i32 + 1;
+                        let x = agentRef.applyMagic(&i.uid, time, 5).await;
+                        if x.is_err() {
+                            return x;
+                        } else {
+                            info!("apply magic on:{}", &i.title);
+                        }
+                    }
+                    info!("promote:new job:{},{} GB", &i.title, &i.U2Info.GbSize);
+                    agentRef.addTorrent(&i.url).await
                 }
             });
             let res = futures::future::join_all(work).await;
@@ -284,7 +296,7 @@ async fn main() -> Result<()> {
         let handleOne = async || -> Result<()> {
             let now = agentSep2.getWorkingTorrent().await?.torrents;
             let mut tot = 0f32;
-            for i in now.into_iter() {
+            for i in now.iter() {
                 let sb = i.total_size.unwrap_or(0) as f32 / 1e9;
                 tot += sb;
             }
@@ -305,6 +317,18 @@ async fn main() -> Result<()> {
                     let _ = i?;
                 }
             }
+            let mut work = Vec::new();
+            for x in now.iter() {
+                let future = agentSep2.performActionOnTorrent(
+                    (x.hash_string.as_ref().ok_or("broken torrent info")?).to_owned(),
+                    TorrentAction::Reannounce,
+                );
+                work.push(future);
+            }
+            let work = futures::future::join_all(work).await;
+            for i in work.into_iter() {
+                let _ = i?;
+            }
             info!("maintain done");
             Ok(())
         };
@@ -315,7 +339,7 @@ async fn main() -> Result<()> {
                     error!("maintain:{}", x);
                 }
             }
-            sleep(Duration::from_secs(60 * 10)).await;
+            sleep(Duration::from_secs(60 * 5)).await;
         }
     });
     let _ = tokio::select! {

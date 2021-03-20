@@ -35,6 +35,7 @@ pub struct RssInfo {
     pub title: String,
     pub url: String,
     pub cat: String,
+    pub uid: String,
     pub U2Info: TorrentInfo,
 }
 
@@ -44,7 +45,8 @@ pub struct Config {
     pub workRoot: String,
     pub proxy: Option<String>,
 
-    pub downloadFx: Option<f32>,
+    pub downloadFxFilter: Option<f32>,
+    pub GBSizeFilter: Option<f32>,
 
     pub RpcURL: String,
     pub RpcUsername: String,
