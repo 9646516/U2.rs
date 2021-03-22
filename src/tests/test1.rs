@@ -8,16 +8,17 @@ use std::time::Duration;
 async fn test() -> Result<()> {
     let f = std::fs::read_to_string("args.toml")?;
     let args: u2client::types::Config = toml::from_str(f.as_str()).unwrap();
-    let agent = U2client::new(
-        &args.cookie,
-        &args.passkey,
-        &args.proxy,
-        &args.RpcURL,
-        &args.RpcUsername,
-        &args.RpcPassword,
-        &args.workRoot,
-    )
-    .await?;
+    let agent =
+        U2client::new(
+            &args.cookie,
+            &args.proxy,
+            &args.RpcURL,
+            &args.RpcUsername,
+            &args.RpcPassword,
+            &args.workRoot,
+        )
+            .await?;
+
 
     let res = agent.getTransmissionSession().await?;
     println!("{:?}\n", res);

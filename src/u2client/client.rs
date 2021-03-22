@@ -253,7 +253,12 @@ impl U2client {
             timeRate,
         })
     }
-    /// 2 => Free 3 => 2x 4 => 2xFree 5 => 50%off 6 => 2x50%off 7 => 30%off
+    /// 2 => Free
+    /// 3 => 2x
+    /// 4 => 2xFree
+    /// 5 => 50%off
+    /// 6 => 2x50%off
+    /// 7 => 30%off
     pub async fn applyMagic(&self, uid: &str, time: i32, magic: i32) -> Result<()> {
         let time = time.max(24);
         let url = format!(
@@ -377,7 +382,7 @@ impl U2client {
 
         let s = U2client::reduceToText(&body, "活力度")?;
         let avgProgress = U2client::matchRegex(&s, "平均进度:[' ']*[(]([0-9]+%)[)]")
-            .unwrap_or_else(|_| String::from("0%"));
+            .unwrap_or_else(|_| String::from("100%"));
         let avgProgress = toNumber(&avgProgress)? / 100.0;
 
         let s = U2client::reduceToText(&body, "种子信息")?;

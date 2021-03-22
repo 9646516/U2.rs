@@ -7,7 +7,6 @@ async fn test() -> Result<()> {
     let args: u2client::types::Config = toml::from_str(f.as_str()).unwrap();
     let agent = U2client::new(
         &args.cookie,
-        &args.passkey,
         &args.proxy,
         &args.RpcURL,
         &args.RpcUsername,
@@ -15,7 +14,8 @@ async fn test() -> Result<()> {
         &args.workRoot,
     )
     .await?;
-    let res = agent.getTorrentInfo("14312").await?;
+
+    let res = agent.getTorrentInfo("42704").await?;
     println!("{:?}\n", res);
     let res = agent.getStats().await?;
     println!("{:?}\n", res);
