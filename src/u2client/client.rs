@@ -65,7 +65,7 @@ impl U2client {
             let uid = Document::from(context.as_str())
                 .find(Name("a"))
                 .filter(|x| match x.attr("class") {
-                    Some(x) => x == "User_Name",
+                    Some(x) => x.split_at(x.len() - 5).1 == "_Name",
                     _ => false,
                 })
                 .filter_map(|n| n.attr("href"))
@@ -214,7 +214,7 @@ impl U2client {
         let username = Document::from(context.as_str())
             .find(Name("a"))
             .find(|x| match x.attr("class") {
-                Some(x) => x == "User_Name",
+                Some(x) => x.split_at(x.len() - 5).1 == "_Name",
                 _ => false,
             })
             .ok_or("getUserInfo:can not find username node")?
